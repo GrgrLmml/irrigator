@@ -1,16 +1,23 @@
 use std::sync::Arc;
 
 use chrono::{Local, Timelike, Utc};
+use teloxide::prelude::*;
 use tokio::sync::Mutex;
 use tracing::info;
 
 use crate::state::AppState;
+use crate::telegram;
 use crate::valve::Valve;
 
 /// Run the scheduler loop. Checks every 30 seconds for:
 /// 1. Auto-off timer expiry
 /// 2. Schedule slot matches
-pub async fn run(state: Arc<Mutex<AppState>>, valve: Arc<Mutex<Valve>>) {
+pub async fn run(
+    state: Arc<Mutex<AppState>>,
+    valve: Arc<Mutex<Valve>>,
+    bot: Bot,
+    chat_id: ChatId,
+) {
     info!("scheduler started");
     let mut last_triggered: Option<(u32, u32)> = None;
 
@@ -28,6 +35,7 @@ pub async fn run(state: Arc<Mutex<AppState>>, valve: Arc<Mutex<Valve>>) {
                         st.valve_open = false;
                         st.auto_off_at = None;
                         st.save();
+                        telegram::notify(&bot, chat_id, "Auto-off: valve CLOSED.").await;
                     }
                 }
             }
@@ -67,6 +75,16 @@ pub async fn run(state: Arc<Mutex<AppState>>, valve: Arc<Mutex<Valve>>) {
                         Some(Utc::now() + chrono::Duration::minutes(duration_min as i64));
                     st.record_watering(duration_min, "schedule");
                     last_triggered = Some((current_hour, current_minute));
+
+                    telegram::notify(
+                        &bot,
+                        chat_id,
+                        &format!(
+                            "Schedule: valve OPENED for {duration_min}min ({:02}:{:02}).",
+                            current_hour, current_minute
+                        ),
+                    )
+                    .await;
                 }
             }
         }

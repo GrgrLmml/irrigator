@@ -37,7 +37,7 @@ A scheduler runs watering slots automatically (default: 4x daily, 8 minutes each
 [5V/3A USB Charger] → [Raspberry Pi 3B]
                           │
                      GPIO 17 (Pin 11) → Relay S (signal)
-                     3.3V  (Pin 1)  → Relay + (VCC)
+                     5V    (Pin 2)  → Relay + (VCC)
                      GND   (Pin 6)  → Relay - (GND) + 12V PSU GND (common ground!)
 
 [12V 2A PSU] → Relay COM
@@ -80,7 +80,7 @@ GPIO26 (37) (38) GPIO20
 
 | Relay Pin | Pi Pin | Pi Label | Location |
 |---|---|---|---|
-| **+** (VCC) | Pin 1 | 3V3 | 1st row, inner |
+| **+** (VCC) | Pin 2 or Pin 4 | 5V | 1st/2nd row, outer |
 | **-** (GND) | Pin 6 | GND | 3rd row, outer |
 | **S** (Signal) | Pin 11 | GPIO17 | 6th row, inner |
 
@@ -155,17 +155,21 @@ Install Tailscale on your laptop/phone too. Then SSH via: `ssh irrigator@<tailsc
 
 ## Build & Deploy
 
-### Cross-compile (from your dev machine)
+### Build via Docker (from your dev machine)
 
 ```bash
-# Install cross if needed
-cargo install cross
+# Build for aarch64 (Pi 3B with 64-bit OS)
+docker buildx build --platform linux/arm64 -t irrigator --load .
 
-# Build for Pi (ARMv7)
-cross build --release --target armv7-unknown-linux-gnueabihf
+# Extract binary
+docker create --name tmp irrigator:latest
+docker cp tmp:/irrigator ./irrigator-bin
+docker rm tmp
 
 # Deploy
-scp target/armv7-unknown-linux-gnueabihf/release/irrigator irrigator@<tailscale-ip>:/usr/local/bin/
+scp ./irrigator-bin irrigator@<tailscale-ip>:/tmp/irrigator
+ssh irrigator@<tailscale-ip> "sudo mv /tmp/irrigator /usr/local/bin/irrigator && sudo chmod +x /usr/local/bin/irrigator"
+sudo systemctl restart irrigator
 ```
 
 ### Systemd Service
@@ -204,6 +208,7 @@ sudo systemctl start irrigator
 - **Forced close on shutdown**: SIGTERM/SIGINT closes the valve before exit
 - **Systemd ExecStopPost**: forces GPIO low even if the process crashes
 - **Owner-only**: Telegram commands only accepted from configured chat ID
+- **Notifications**: Telegram messages on startup, shutdown, scheduled watering, and auto-off
 
 ## Development
 
@@ -214,8 +219,8 @@ The project compiles on macOS/Linux for development — GPIO calls are stubbed o
 cargo check
 cargo run  # runs with stub GPIO, needs TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID
 
-# ARM build
-cross build --release --target armv7-unknown-linux-gnueabihf
+# ARM build via Docker
+docker buildx build --platform linux/arm64 -t irrigator --load .
 ```
 
 ## License

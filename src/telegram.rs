@@ -31,6 +31,13 @@ enum Command {
     Start,
 }
 
+/// Send a notification message to the owner chat.
+pub async fn notify(bot: &Bot, chat_id: ChatId, message: &str) {
+    if let Err(e) = bot.send_message(chat_id, message).await {
+        tracing::warn!(error = %e, "failed to send notification");
+    }
+}
+
 pub async fn run(
     bot_token: String,
     chat_id: i64,

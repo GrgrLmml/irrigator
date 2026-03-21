@@ -5,6 +5,7 @@ mod valve;
 
 use std::sync::Arc;
 
+use teloxide::prelude::*;
 use tokio::signal;
 use tokio::sync::Mutex;
 use tracing::info;
@@ -35,6 +36,12 @@ async fn main() {
         Valve::new(relay_pin).expect("failed to initialize GPIO"),
     ));
 
+    let bot = Bot::new(&bot_token);
+    let allowed_chat = ChatId(chat_id);
+
+    // Send startup notification.
+    telegram::notify(&bot, allowed_chat, "Irrigator started. Valve OFF.").await;
+
     info!("irrigator starting");
 
     // Spawn telegram bot.
@@ -47,8 +54,9 @@ async fn main() {
     // Spawn scheduler.
     let sched_state = Arc::clone(&state);
     let sched_valve = Arc::clone(&valve);
+    let sched_bot = bot.clone();
     let sched_handle = tokio::spawn(async move {
-        scheduler::run(sched_state, sched_valve).await;
+        scheduler::run(sched_state, sched_valve, sched_bot, allowed_chat).await;
     });
 
     // Wait for shutdown signal.
@@ -59,6 +67,8 @@ async fn main() {
     valve.lock().await.close();
     state.lock().await.valve_open = false;
     state.lock().await.save();
+
+    telegram::notify(&bot, allowed_chat, "Irrigator shutting down. Valve OFF.").await;
     info!("valve closed, state saved, exiting");
 
     tg_handle.abort();
