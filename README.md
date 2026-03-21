@@ -2,7 +2,7 @@
 
 Raspberry Pi-based garden irrigation controller with a Telegram bot interface. Built for a 10m x 2.5m driveway lawn seeding project — keeps freshly seeded lawn moist during the ~3 week germination period.
 
-The system runs on a Raspberry Pi 3B with LTE cellular connectivity (no WiFi at the deployment site), controlled remotely via Telegram over a Tailscale VPN.
+The system runs on a Raspberry Pi 3B with LTE cellular connectivity (no WiFi at the deployment site), controlled remotely via Telegram or SSH over Tailscale VPN.
 
 ## How It Works
 
