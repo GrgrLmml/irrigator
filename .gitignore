@@ -2,3 +2,4 @@
 target/
 state.json
 Cargo.lock
+irrigator-bin
