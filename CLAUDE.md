@@ -4,49 +4,47 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Raspberry Pi 3B-based garden irrigation controller. Remotely controlled via REST API over Tailscale VPN (LTE cellular, no WiFi at site), with SMS fallback via ZTE MF833U1 dongle HTTP API. See `docs/IRRIGATION_PLAN.md` for full hardware inventory, wiring, and deployment steps.
+Rust-based Raspberry Pi 3B garden irrigation controller. Controlled via Telegram bot over Tailscale VPN (LTE cellular, no WiFi at deployment site). See `docs/IRRIGATION_PLAN.md` for hardware inventory, wiring, and deployment details.
 
 ## Architecture
 
-The system has these core components:
-- **REST API** (Axum or FastAPI) — valve control, schedule management, status/log endpoints on port 8080
-- **Schedule Runner** — async loop that fires watering slots (default: 4×/day, 8 min each for germination)
-- **Command Processor** — shared text command interface used by both REST API and SMS handler
-- **Valve Controller** — GPIO 17 control (active-high relay → 12V NC solenoid valve)
-- **State Manager** — JSON file persistence at `/etc/irrigator/state.json`, config at `/etc/irrigator/config.json`
-- **SMS Handler** — polls ZTE dongle HTTP API for incoming SMS, sends responses
-- **Sensor Receiver** (future) — ESP32 serial USB listener for soil moisture data
+Two async loops running concurrently via `tokio::spawn`:
 
-All inputs (API, SMS, schedule) flow through the Command Processor to the Valve Controller. State is persisted to JSON on every change.
+- **Telegram polling loop** (`src/telegram.rs`) — receives commands via teloxide `repl`, sends replies. Filters by `TELEGRAM_CHAT_ID`.
+- **Scheduler loop** (`src/scheduler.rs`) — checks every 30s for schedule slot matches and auto-off timer expiry.
+
+Shared state via `Arc<Mutex<AppState>>` and `Arc<Mutex<Valve>>`.
+
+Key modules:
+- `src/valve.rs` — GPIO 17 control via `rppal`. Compiles as stub on non-Linux (macOS dev).
+- `src/state.rs` — `AppState` struct with JSON persistence. Schedule config, watering log, valve status.
+- `src/main.rs` — entry point, signal handling, spawns both loops.
 
 ## Key Constraints
 
-- **Target**: Raspberry Pi 3B, Raspberry Pi OS Lite 64-bit (Debian Bookworm), ARMv7
-- **Cross-compilation** (Rust): target `armv7-unknown-linux-gnueabihf`, use `cross` tool
-- **GPIO**: pin 17 (BCM), active-high. Relay VCC on 3.3V. Pi GND must share common ground with 12V PSU
-- **Safety invariants**: valve always OFF on boot/restart; every open command has max duration (default 120 min); SIGTERM/SIGINT must close valve before exit
-- **Reserved GPIO pins**: 2, 3 (I²C for future ADC), 27 (zone 2), 22 (zone 3), 4 (temp sensor)
-- **SMS commands accepted only from configured owner phone number**
+- **Target**: Raspberry Pi 3B, Raspberry Pi OS Lite 64-bit, ARMv7
+- **GPIO**: pin 17 (BCM), active-high relay. `rppal` crate, only compiles on Linux. Stubbed on other platforms via `#[cfg(target_os)]`.
+- **Safety invariants**: valve always OFF on boot/restart/shutdown; every open has max duration (default 120 min); SIGTERM closes valve.
+- **Reserved GPIO pins**: 2, 3 (I2C), 27 (zone 2), 22 (zone 3), 4 (temp sensor)
 
-## Build & Deploy (Rust path)
+## Build & Deploy
 
 ```bash
+# Local dev (stub GPIO)
+cargo check
+cargo run  # needs TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in .env
+
 # Cross-compile for Pi
 cross build --release --target armv7-unknown-linux-gnueabihf
 
-# Deploy binary
-scp target/armv7-unknown-linux-gnueabihf/release/irrigator pi@irrigator:/usr/local/bin/
-
-# Service management on Pi
+# Deploy
+scp target/armv7-unknown-linux-gnueabihf/release/irrigator irrigator@<tailscale-ip>:/usr/local/bin/
 sudo systemctl restart irrigator
-sudo systemctl status irrigator
 journalctl -u irrigator -f
 ```
 
-## Build & Deploy (Python path)
+## Environment Variables
 
-```bash
-# On Pi
-/opt/irrigator/venv/bin/pip install -r requirements.txt
-sudo systemctl restart irrigator
-```
+- `TELEGRAM_BOT_TOKEN` — from @BotFather
+- `TELEGRAM_CHAT_ID` — numeric chat ID, only this chat can send commands
+- `RUST_LOG` — optional, defaults to `irrigator=info`
