@@ -36,9 +36,9 @@ A scheduler runs watering slots automatically (default: 4x daily, 8 minutes each
 ```
 [5V/3A USB Charger] → [Raspberry Pi 3B]
                           │
-                     GPIO 17 (Pin 11) → Relay IN
-                     3.3V  (Pin 1)  → Relay VCC
-                     GND   (Pin 6)  → Relay GND + 12V PSU GND (common ground!)
+                     GPIO 17 (Pin 11) → Relay S (signal)
+                     3.3V  (Pin 1)  → Relay + (VCC)
+                     GND   (Pin 6)  → Relay - (GND) + 12V PSU GND (common ground!)
 
 [12V 2A PSU] → Relay COM
                Relay NO → Solenoid Valve (+)
@@ -46,6 +46,43 @@ A scheduler runs watering slots automatically (default: 4x daily, 8 minutes each
 
 Add 1N4007 flyback diode across solenoid terminals (cathode to +12V side).
 ```
+
+### GPIO Pinout
+
+The `1` on the board marks Pin 1. Odd pins are on the inner row (closer to the board center), even pins on the outer row (closer to the board edge).
+
+```
+J8 Header (top view, active USB ports on the right):
+
+   3V3  (1) (2)  5V
+ GPIO2  (3) (4)  5V
+ GPIO3  (5) (6)  GND
+ GPIO4  (7) (8)  GPIO14
+   GND  (9) (10) GPIO15
+GPIO17 (11) (12) GPIO18
+GPIO27 (13) (14) GND
+GPIO22 (15) (16) GPIO23
+   3V3 (17) (18) GPIO24
+GPIO10 (19) (20) GND
+ GPIO9 (21) (22) GPIO25
+GPIO11 (23) (24) GPIO8
+   GND (25) (26) GPIO7
+ GPIO0 (27) (28) GPIO1
+ GPIO5 (29) (30) GND
+ GPIO6 (31) (32) GPIO12
+GPIO13 (33) (34) GND
+GPIO19 (35) (36) GPIO16
+GPIO26 (37) (38) GPIO20
+   GND (39) (40) GPIO21
+```
+
+**Relay connections** (KY-019 has a 3-pin header with S, +, -):
+
+| Relay Pin | Pi Pin | Pi Label | Location |
+|---|---|---|---|
+| **+** (VCC) | Pin 1 | 3V3 | 1st row, inner |
+| **-** (GND) | Pin 6 | GND | 3rd row, outer |
+| **S** (Signal) | Pin 11 | GPIO17 | 6th row, inner |
 
 ## Pi Setup
 
