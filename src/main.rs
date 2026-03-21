@@ -39,8 +39,9 @@ async fn main() {
     let bot = Bot::new(&bot_token);
     let allowed_chat = ChatId(chat_id);
 
-    // Send startup notification.
-    telegram::notify(&bot, allowed_chat, "Irrigator started. Valve OFF.").await;
+    // Send startup notification with schedule.
+    let schedule_info = state.lock().await.schedule_text();
+    telegram::notify(&bot, allowed_chat, &format!("Irrigator started. Valve OFF.\n\n{schedule_info}")).await;
 
     info!("irrigator starting");
 
