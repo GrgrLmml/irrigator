@@ -4,6 +4,12 @@ Raspberry Pi-based garden irrigation controller with a Telegram bot interface. B
 
 The system runs on a Raspberry Pi 3B with LTE cellular connectivity (no WiFi at the deployment site), controlled remotely via Telegram or SSH over Tailscale VPN.
 
+## Why Rust?
+
+The natural choice for someone coming from ML/data science would be Python — rich ecosystem, quick to prototype, plenty of GPIO and Telegram libraries. But this runs unattended on a Pi 3B at a remote site with no WiFi, powered over LTE. It needs to run for weeks or months without restarts, survive power outages, and not waste the 1GB of RAM on a runtime.
+
+Rust gives us a single static binary (~10MB), no runtime dependencies, no GC pauses, and predictable memory usage. The Pi OS was stripped down to the bare minimum — no desktop, no X server, no browser — leaving ~700MB of free RAM. The irrigator daemon starts automatically via systemd on boot, so after a power outage the Pi just comes back up and resumes watering. You get a Telegram notification when it does.
+
 ## How It Works
 
 A solenoid valve controls water flow from an outdoor tap through two soaker hoses. The Pi toggles the valve via a relay on GPIO 17. You control everything through Telegram:
