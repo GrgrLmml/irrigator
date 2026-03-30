@@ -8,7 +8,7 @@ The system runs on a Raspberry Pi 3B with LTE cellular connectivity (no WiFi at 
 
 The natural choice for someone coming from ML/data science would be Python — rich ecosystem, quick to prototype, plenty of GPIO and Telegram libraries. But this runs unattended on a Pi 3B at a remote site with no WiFi, powered over LTE. It needs to run for weeks or months without restarts, survive power outages, and not waste the 1GB of RAM on a runtime.
 
-Rust gives us a single static binary (~10MB), no runtime dependencies, no GC pauses, and predictable memory usage. The Pi OS was stripped down to the bare minimum — no desktop, no X server, no browser — leaving ~700MB of free RAM. The irrigator daemon starts automatically via systemd on boot, so after a power outage the Pi just comes back up and resumes watering. You get a Telegram notification when it does.
+Rust gives us a single static binary (~10MB), no runtime dependencies, no GC pauses, and predictable memory usage. The Pi OS was stripped down to the bare minimum — no desktop, no X server, no browser. Total system memory usage including the OS, Tailscale, and the irrigator daemon: **124MB out of 906MB**. The irrigator daemon starts automatically via systemd on boot, so after a power outage the Pi just comes back up and resumes watering. You get a Telegram notification when it does.
 
 ## How It Works
 
@@ -157,7 +157,7 @@ curl -s 'http://192.168.0.1/goform/goform_get_cmd_process?isTest=false&cmd=signa
 
 ### 4. Tailscale
 
-Provides stable remote access over LTE without opening ports:
+Mobile carriers typically block inbound connections, so you can't SSH directly to the Pi's public IP. [Tailscale](https://tailscale.com) solves this — it creates a private VPN mesh between your devices using outbound connections only. No port forwarding, no dynamic DNS, no firewall rules. Free for personal use (up to 100 devices).
 
 ```bash
 curl -fsSL https://tailscale.com/install.sh | sh
@@ -165,7 +165,7 @@ sudo tailscale up --ssh
 # Open the printed URL in your browser to authenticate
 ```
 
-Install Tailscale on your laptop/phone too. Then SSH via: `ssh irrigator@<tailscale-ip>`
+Install Tailscale on your laptop/phone too. Both devices get a stable `100.x.x.x` address. Then SSH via: `ssh irrigator@<tailscale-ip>`
 
 ### 5. Telegram Bot
 
