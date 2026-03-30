@@ -40,7 +40,7 @@ Key specs to look for:
 - **Normally closed (NC)** — valve closes when power is off. This is a safety requirement.
 - **Direct-acting** — opens with just the solenoid, no water pressure needed. Pilot-operated valves require minimum pressure and won't work dry (can't test on your desk).
 - **0 bar minimum pressure** — confirms it's truly direct-acting.
-- **3/4" G thread** — standard garden hose size, fits Gardena adapters.
+- **1/2" or 3/4" G thread** — either works. The valve has female threads, so you'll need male-to-male adapters (e.g., 1/2" to 3/4") to connect Gardena adapters on each side.
 - **IP65 or better** — for outdoor use.
 
 Actual power draw may be lower than rated. Our FSA valve is rated 20W but measures 20Ω, so actual draw is ~0.6A / 7.2W at 12V. The watt rating is the max the coil can dissipate, not actual consumption. A 12V 2A PSU is sufficient.
