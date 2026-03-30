@@ -1,5 +1,7 @@
 # Irrigation Controller — Implementation Plan
 
+> **Note:** This is the original planning document. The actual implementation chose Rust with Telegram (no REST API or SMS). See the [README](../README.md) for current architecture and setup instructions.
+
 ## Project Overview
 
 Build a remotely-controlled garden irrigation system for a 10m × 2.5m driveway lawn seeding project. The system runs on a Raspberry Pi 3B with LTE cellular connectivity (no WiFi available at site), controlled via SSH/REST API over Tailscale VPN, with SMS as fallback. The primary goal is to keep freshly seeded lawn moist for ~3 weeks during germination.
