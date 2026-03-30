@@ -21,6 +21,15 @@ A solenoid valve controls water flow from an outdoor tap through two soaker hose
 
 A scheduler runs watering slots automatically (default: 4x daily, 8 minutes each). Every valve open has a max duration timer (default 120 min) to prevent flooding if connectivity is lost.
 
+## Photos
+
+| | |
+|---|---|
+| ![Controller box](docs/images/controller-box.jpg) | ![Relay wiring](docs/images/relay-wiring.jpg) |
+| Pi 3B + LTE dongle + relay in enclosure | KY-019 relay wiring detail |
+| ![FSA valve](docs/images/fsa-valve-with-adapters.jpg) | ![Enclosure](docs/images/enclosure-ventilation.jpg) |
+| FSA brass valve with Gardena adapters | Ventilated enclosure with plastic wrap weatherproofing |
+
 ## Hardware
 
 | Component | Model |
