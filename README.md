@@ -28,8 +28,22 @@ A scheduler runs watering slots automatically (default: 4x daily, 8 minutes each
 | Computer | Raspberry Pi 3 Model B |
 | LTE Dongle | ZTE MF833U1 |
 | Relay | AZDelivery KY-019 5V 1-channel |
-| Solenoid Valve | 12V DC NC 3/4" DN20 |
+| Solenoid Valve | FSA brass 3/4" 12V DC, normally closed, direct-acting, 0-10 bar |
 | Sprinklers | 2x Gardena Perl-Regner 15m soaker hose |
+
+### Choosing a Solenoid Valve
+
+Get a **brass, direct-acting** valve. Avoid cheap plastic valves — they tend to be unreliable and poorly sealed.
+
+Key specs to look for:
+- **12V DC** — safe for outdoor DIY use. Avoid 230V AC (dangerous around water, VDE regulations apply in Germany).
+- **Normally closed (NC)** — valve closes when power is off. This is a safety requirement.
+- **Direct-acting** — opens with just the solenoid, no water pressure needed. Pilot-operated valves require minimum pressure and won't work dry (can't test on your desk).
+- **0 bar minimum pressure** — confirms it's truly direct-acting.
+- **3/4" G thread** — standard garden hose size, fits Gardena adapters.
+- **IP65 or better** — for outdoor use.
+
+Actual power draw may be lower than rated. Our FSA valve is rated 20W but measures 20Ω, so actual draw is ~0.6A / 7.2W at 12V. The watt rating is the max the coil can dissipate, not actual consumption. A 12V 2A PSU is sufficient.
 
 ### Wiring
 
