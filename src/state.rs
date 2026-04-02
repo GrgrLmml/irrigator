@@ -45,6 +45,8 @@ pub struct WateringEvent {
     pub timestamp: DateTime<Utc>,
     pub duration_min: u32,
     pub source: String,
+    #[serde(default)]
+    pub volume_liters: Option<f64>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -54,6 +56,8 @@ pub struct AppState {
     pub schedule: Schedule,
     pub max_on_minutes: u32,
     pub relay_pin: u8,
+    #[serde(default = "default_flow_pin")]
+    pub flow_pin: u8,
     pub log: Vec<WateringEvent>,
     pub boot_time: DateTime<Utc>,
 
@@ -69,6 +73,7 @@ impl Default for AppState {
             schedule: Schedule::default(),
             max_on_minutes: 120,
             relay_pin: 17,
+            flow_pin: 22,
             log: Vec::new(),
             boot_time: Utc::now(),
             state_path: PathBuf::from(DEFAULT_STATE_PATH),
@@ -130,16 +135,24 @@ impl AppState {
         }
     }
 
-    pub fn record_watering(&mut self, duration_min: u32, source: &str) {
+    pub fn record_watering(&mut self, duration_min: u32, source: &str, volume_liters: Option<f64>) {
         self.log.push(WateringEvent {
             timestamp: Utc::now(),
             duration_min,
             source: source.to_string(),
+            volume_liters,
         });
         if self.log.len() > MAX_LOG_ENTRIES {
             self.log.drain(0..self.log.len() - MAX_LOG_ENTRIES);
         }
         self.save();
+    }
+
+    pub fn update_last_watering_volume(&mut self, liters: f64) {
+        if let Some(last) = self.log.last_mut() {
+            last.volume_liters = Some(liters);
+            self.save();
+        }
     }
 
     pub fn status_text(&self) -> String {
@@ -175,7 +188,12 @@ impl AppState {
             local_now.format("%H:%M %Z"),
             self.log
                 .last()
-                .map(|e| format!("{} ({}min, {})", e.timestamp.with_timezone(&Local).format("%H:%M"), e.duration_min, e.source))
+                .map(|e| {
+                    let vol = e.volume_liters
+                        .map(|v| format!(", {:.1}L", v))
+                        .unwrap_or_default();
+                    format!("{} ({}min, {}{})", e.timestamp.with_timezone(&Local).format("%H:%M"), e.duration_min, e.source, vol)
+                })
                 .unwrap_or_else(|| "none".to_string()),
         )
     }
@@ -217,6 +235,10 @@ impl AppState {
                 .unwrap_or_else(|| "none".to_string()),
         }
     }
+}
+
+fn default_flow_pin() -> u8 {
+    22
 }
 
 use chrono::Timelike;

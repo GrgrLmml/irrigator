@@ -1,3 +1,4 @@
+mod flow;
 mod scheduler;
 mod state;
 mod telegram;
@@ -10,6 +11,7 @@ use tokio::signal;
 use tokio::sync::Mutex;
 use tracing::info;
 
+use flow::FlowSensor;
 use valve::Valve;
 
 #[tokio::main]
@@ -36,6 +38,11 @@ async fn main() {
         Valve::new(relay_pin).expect("failed to initialize GPIO"),
     ));
 
+    let flow_pin = state.lock().await.flow_pin;
+    let flow = Arc::new(Mutex::new(
+        FlowSensor::new(flow_pin).expect("failed to initialize flow sensor"),
+    ));
+
     let bot = Bot::new(&bot_token);
     let allowed_chat = ChatId(chat_id);
 
@@ -48,16 +55,18 @@ async fn main() {
     // Spawn telegram bot.
     let tg_state = Arc::clone(&state);
     let tg_valve = Arc::clone(&valve);
+    let tg_flow = Arc::clone(&flow);
     let tg_handle = tokio::spawn(async move {
-        telegram::run(bot_token, chat_id, tg_state, tg_valve).await;
+        telegram::run(bot_token, chat_id, tg_state, tg_valve, tg_flow).await;
     });
 
     // Spawn scheduler.
     let sched_state = Arc::clone(&state);
     let sched_valve = Arc::clone(&valve);
+    let sched_flow = Arc::clone(&flow);
     let sched_bot = bot.clone();
     let sched_handle = tokio::spawn(async move {
-        scheduler::run(sched_state, sched_valve, sched_bot, allowed_chat).await;
+        scheduler::run(sched_state, sched_valve, sched_flow, sched_bot, allowed_chat).await;
     });
 
     // Wait for shutdown signal.

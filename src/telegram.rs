@@ -5,6 +5,7 @@ use teloxide::utils::command::BotCommands;
 use tokio::sync::Mutex;
 use tracing::{info, warn};
 
+use crate::flow::FlowSensor;
 use crate::state::AppState;
 use crate::valve::Valve;
 
@@ -43,6 +44,7 @@ pub async fn run(
     chat_id: i64,
     state: Arc<Mutex<AppState>>,
     valve: Arc<Mutex<Valve>>,
+    flow: Arc<Mutex<FlowSensor>>,
 ) {
     info!("telegram bot starting...");
     let bot = Bot::new(bot_token);
@@ -51,6 +53,7 @@ pub async fn run(
     teloxide::repl(bot, move |bot: Bot, msg: Message| {
         let state = Arc::clone(&state);
         let valve = Arc::clone(&valve);
+        let flow = Arc::clone(&flow);
         let allowed_chat = allowed_chat;
         async move {
             if msg.chat.id != allowed_chat {
@@ -63,7 +66,7 @@ pub async fn run(
             };
 
             let response = match Command::parse(text, "irrigator") {
-                Ok(cmd) => handle_command(cmd, &state, &valve).await,
+                Ok(cmd) => handle_command(cmd, &state, &valve, &flow).await,
                 Err(_) => "Unknown command. Send /help for available commands.".to_string(),
             };
 
@@ -81,6 +84,7 @@ async fn handle_command(
     cmd: Command,
     state: &Arc<Mutex<AppState>>,
     valve: &Arc<Mutex<Valve>>,
+    flow: &Arc<Mutex<FlowSensor>>,
 ) -> String {
     match cmd {
         Command::On(args) => {
@@ -94,23 +98,39 @@ async fn handle_command(
                 return format!("Max duration is {} minutes.", st.max_on_minutes);
             }
 
+            flow.lock().await.start_session();
             valve.lock().await.open();
             st.valve_open = true;
             st.auto_off_at = Some(chrono::Utc::now() + chrono::Duration::minutes(minutes as i64));
-            st.record_watering(minutes, "telegram");
+            st.record_watering(minutes, "telegram", None);
             format!("Valve OPENED for {minutes} minutes.")
         }
         Command::Off => {
+            let final_liters = flow.lock().await.session_liters();
             valve.lock().await.close();
             let mut st = state.lock().await;
+            let had_valve_open = st.valve_open;
             st.valve_open = false;
             st.auto_off_at = None;
-            st.save();
-            "Valve CLOSED.".to_string()
+            if had_valve_open {
+                st.update_last_watering_volume(final_liters);
+            } else {
+                st.save();
+            }
+            if had_valve_open && final_liters > 0.0 {
+                format!("Valve CLOSED. Total: {final_liters:.1}L.")
+            } else {
+                "Valve CLOSED.".to_string()
+            }
         }
         Command::Status => {
             let st = state.lock().await;
-            st.status_text()
+            let mut text = st.status_text();
+            if st.valve_open {
+                let sensor = flow.lock().await;
+                text.push_str(&format!("\nFlow: {:.1}L", sensor.session_liters()));
+            }
+            text
         }
         Command::Schedule => {
             let st = state.lock().await;
