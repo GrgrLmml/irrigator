@@ -35,6 +35,8 @@ A scheduler runs watering slots automatically (default: 4x daily, 8 minutes each
 | Pi 3B + LTE dongle + relay in enclosure | KY-019 relay wiring detail |
 | ![FSA valve](docs/images/fsa-valve-with-adapters.jpg) | ![Enclosure](docs/images/enclosure-ventilation.jpg) |
 | FSA brass valve with Gardena adapters | Ventilated enclosure with plastic wrap weatherproofing |
+| ![Flow sensor](docs/images/flow-sensor.jpg) | |
+| YF-B2 flow sensor with Gardena adapter | |
 
 ## Hardware
 
@@ -44,6 +46,7 @@ A scheduler runs watering slots automatically (default: 4x daily, 8 minutes each
 | LTE Dongle | ZTE MF833U1 |
 | Relay | AZDelivery KY-019 5V 1-channel |
 | Solenoid Valve | FSA brass 3/4" 12V DC, normally closed, direct-acting, 0-10 bar |
+| Flow Sensor | YF-B2 brass Hall-effect, 1-25 L/min, G1/2" |
 | Sprinklers | 2x Gardena Perl-Regner 15m soaker hose |
 
 ### Choosing a Solenoid Valve
@@ -74,7 +77,18 @@ Actual power draw may be lower than rated. Our FSA valve is rated 20W but measur
                           Solenoid Valve (−) → 12V PSU GND
 
 Add 1N4007 flyback diode across solenoid terminals (cathode to +12V side).
+
+[YF-B2 Flow Sensor] (Hall-effect, 3 wires)
+  Red    → 5V (Pin 4)
+  Black  → GND (Pin 6)
+  Yellow → GPIO 22 (Pin 15) — pulse output, use internal pull-up
 ```
+
+### Flow Sensor
+
+The YF-B2 is a brass Hall-effect water flow sensor (1-25 L/min, ≤1.75 MPa). It outputs digital pulses as water flows through — each pulse corresponds to a fixed volume (~450 pulses per liter). The Pi counts pulses on GPIO 22 to measure flow rate and total volume.
+
+The sensor's signal pin is open-collector, so it needs a pull-up resistor. Instead of an external 10kΩ resistor, we use the Pi's built-in GPIO pull-up (`into_input_pullup()` in rppal). Install it after the valve, between valve and soaker hoses.
 
 ### GPIO Pinout
 
@@ -112,6 +126,14 @@ GPIO26 (37) (38) GPIO20
 | **+** (VCC) | Pin 2 or Pin 4 | 5V | 1st/2nd row, outer |
 | **-** (GND) | Pin 6 | GND | 3rd row, outer |
 | **S** (Signal) | Pin 11 | GPIO17 | 6th row, inner |
+
+**Flow sensor connections** (YF-B2 has 3 wires: red, black, yellow):
+
+| Wire | Pi Pin | Pi Label | Location |
+|---|---|---|---|
+| **Red** (VCC) | Pin 4 | 5V | 2nd row, outer |
+| **Black** (GND) | Pin 6 | GND | 3rd row, outer |
+| **Yellow** (Signal) | Pin 15 | GPIO22 | 8th row, inner |
 
 ## Pi Setup
 
