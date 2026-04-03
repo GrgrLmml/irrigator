@@ -86,7 +86,9 @@ Add 1N4007 flyback diode across solenoid terminals (cathode to +12V side).
 
 ### Flow Sensor
 
-The YF-B2 is a brass Hall-effect water flow sensor (1-25 L/min, ≤1.75 MPa). It outputs digital pulses as water flows through — each pulse corresponds to a fixed volume (~450 pulses per liter). The Pi counts pulses on GPIO 22 to measure flow rate and total volume.
+The YF-B2 is a brass Hall-effect water flow sensor (1-25 L/min, ≤1.75 MPa). It outputs digital pulses as water flows through — each pulse corresponds to a fixed volume. The Pi counts pulses on GPIO 22 to measure flow rate and total volume. Calibrated to ~617 pulses per liter (the datasheet says ~450, but actual calibration with a 7L bucket showed otherwise).
+
+During watering, the daemon sends periodic Telegram updates (every 2 minutes or every 5L) and a final total when the valve closes.
 
 The sensor's signal pin is open-collector, so it needs a pull-up resistor. Instead of an external 10kΩ resistor, we use the Pi's built-in GPIO pull-up (`into_input_pullup()` in rppal). Install it after the valve, between valve and soaker hoses.
 

@@ -3,7 +3,8 @@ use std::sync::Arc;
 
 use tracing::info;
 
-const PULSES_PER_LITER: f64 = 450.0;
+// Calibrated: 7L actual measured as 9.6L at 450 → 450 × 9.6/7 ≈ 617.
+const PULSES_PER_LITER: f64 = 617.0;
 
 pub struct FlowSensor {
     pulse_count: Arc<AtomicU64>,

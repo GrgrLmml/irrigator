@@ -47,37 +47,66 @@ pub async fn run(
     flow: Arc<Mutex<FlowSensor>>,
 ) {
     info!("telegram bot starting...");
-    let bot = Bot::new(bot_token);
-    let allowed_chat = ChatId(chat_id);
+    let mut backoff_secs = 2u64;
+    const MAX_BACKOFF: u64 = 120;
 
-    teloxide::repl(bot, move |bot: Bot, msg: Message| {
+    loop {
+        let bot = Bot::new(&bot_token);
+        let allowed_chat = ChatId(chat_id);
         let state = Arc::clone(&state);
         let valve = Arc::clone(&valve);
         let flow = Arc::clone(&flow);
-        let allowed_chat = allowed_chat;
-        async move {
-            if msg.chat.id != allowed_chat {
-                warn!(chat_id = %msg.chat.id, "ignoring message from unauthorized chat");
-                return Ok(());
+
+        // teloxide::repl panics on network errors during init (e.g. DNS failure
+        // when LTE isn't ready yet). Catch the panic and retry with backoff.
+        let result = tokio::spawn(async move {
+            teloxide::repl(bot, move |bot: Bot, msg: Message| {
+                let state = Arc::clone(&state);
+                let valve = Arc::clone(&valve);
+                let flow = Arc::clone(&flow);
+                let allowed_chat = allowed_chat;
+                async move {
+                    if msg.chat.id != allowed_chat {
+                        warn!(chat_id = %msg.chat.id, "ignoring message from unauthorized chat");
+                        return Ok(());
+                    }
+
+                    let Some(text) = msg.text() else {
+                        return Ok(());
+                    };
+
+                    let response = match Command::parse(text, "irrigator") {
+                        Ok(cmd) => handle_command(cmd, &state, &valve, &flow).await,
+                        Err(_) => "Unknown command. Send /help for available commands.".to_string(),
+                    };
+
+                    if let Err(e) = bot.send_message(msg.chat.id, &response).await {
+                        warn!(error = %e, "failed to send telegram reply");
+                    }
+
+                    Ok(())
+                }
+            })
+            .await;
+        })
+        .await;
+
+        match result {
+            Ok(()) => {
+                warn!("telegram repl exited unexpectedly, restarting in {backoff_secs}s");
             }
-
-            let Some(text) = msg.text() else {
-                return Ok(());
-            };
-
-            let response = match Command::parse(text, "irrigator") {
-                Ok(cmd) => handle_command(cmd, &state, &valve, &flow).await,
-                Err(_) => "Unknown command. Send /help for available commands.".to_string(),
-            };
-
-            if let Err(e) = bot.send_message(msg.chat.id, &response).await {
-                warn!(error = %e, "failed to send telegram reply");
+            Err(e) => {
+                warn!(
+                    error = %e,
+                    backoff = backoff_secs,
+                    "telegram repl panicked, retrying in {backoff_secs}s"
+                );
             }
-
-            Ok(())
         }
-    })
-    .await;
+
+        tokio::time::sleep(tokio::time::Duration::from_secs(backoff_secs)).await;
+        backoff_secs = (backoff_secs * 2).min(MAX_BACKOFF);
+    }
 }
 
 async fn handle_command(
