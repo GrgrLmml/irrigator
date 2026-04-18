@@ -225,34 +225,38 @@ ssh irrigator@<tailscale-ip> "sudo mv /tmp/irrigator /usr/local/bin/irrigator &&
 sudo systemctl restart irrigator
 ```
 
-### Systemd Service
+### Systemd Units & Watchdog
 
-Create `/etc/systemd/system/irrigator.service` on the Pi:
-
-```ini
-[Unit]
-Description=Irrigation Controller
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-ExecStart=/usr/local/bin/irrigator
-Restart=always
-RestartSec=5
-User=root
-EnvironmentFile=/etc/irrigator/.env
-ExecStopPost=/bin/sh -c 'echo 17 > /sys/class/gpio/export 2>/dev/null; echo out > /sys/class/gpio/gpio17/direction; echo 0 > /sys/class/gpio/gpio17/value'
-
-[Install]
-WantedBy=multi-user.target
-```
+All systemd units and the LTE watchdog script live in [`deploy/`](deploy/). Install them with:
 
 ```bash
-sudo systemctl daemon-reload
-sudo systemctl enable irrigator
-sudo systemctl start irrigator
+./deploy/install.sh              # defaults to irrigator@irrigator
+./deploy/install.sh pi@other-host
 ```
+
+The installer copies the unit files, enables the watchdog timer, and sets up persistent journald. Re-run it whenever a unit file changes.
+
+Then enable and start the irrigator service:
+
+```bash
+ssh irrigator@irrigator "sudo systemctl enable --now irrigator"
+```
+
+### LTE Watchdog
+
+The Pi is deployed on LTE, which occasionally drops (carrier issue, DHCP lease timeout, or a stuck ZTE dongle). The watchdog runs every 10 minutes via systemd timer:
+
+1. Ping `1.1.1.1` via `eth1`
+2. On 1st failure: log it
+3. On 2nd consecutive failure: force `dhcpcd` renewal on eth1
+4. On 3rd consecutive failure: reboot
+5. Any successful ping resets the failure counter
+
+Check watchdog activity: `sudo journalctl -t lte-watchdog`
+
+### Persistent Logs
+
+Raspberry Pi OS Lite doesn't persist journald logs by default — they vanish on reboot. `deploy/install.sh` creates `/var/log/journal/` which enables persistent logging. Essential for post-mortem debugging after an outage.
 
 ## Safety
 

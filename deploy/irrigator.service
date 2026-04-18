@@ -1,0 +1,17 @@
+[Unit]
+Description=Irrigation Controller
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/irrigator
+Restart=always
+RestartSec=5
+User=root
+WorkingDirectory=/home/irrigator/irrigator
+EnvironmentFile=/home/irrigator/irrigator/.env
+ExecStopPost=/bin/sh -c 'echo 17 > /sys/class/gpio/export 2>/dev/null; echo out > /sys/class/gpio/gpio17/direction; echo 0 > /sys/class/gpio/gpio17/value'
+
+[Install]
+WantedBy=multi-user.target
