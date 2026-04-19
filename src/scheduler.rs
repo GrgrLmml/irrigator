@@ -38,9 +38,7 @@ pub async fn run(
                         info!("auto-off timer expired, closing valve");
                         let final_liters = flow.lock().await.session_liters();
                         valve.lock().await.close();
-                        st.valve_open = false;
-                        st.auto_off_at = None;
-                        st.update_last_watering_volume(final_liters);
+                        st.finish_session(final_liters);
                         telegram::notify(
                             &bot,
                             chat_id,
@@ -108,10 +106,7 @@ pub async fn run(
 
                     flow.lock().await.start_session();
                     valve.lock().await.open();
-                    st.valve_open = true;
-                    st.auto_off_at =
-                        Some(Utc::now() + chrono::Duration::minutes(duration_min as i64));
-                    st.record_watering(duration_min, "schedule", None);
+                    st.start_session(duration_min, "schedule");
                     last_triggered = Some((current_hour, current_minute));
                     last_flow_report = Some(tokio::time::Instant::now());
                     last_reported_liters = 0.0;

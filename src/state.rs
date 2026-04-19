@@ -5,7 +5,8 @@ use serde::{Deserialize, Serialize};
 
 const DEFAULT_STATE_PATH: &str = "./state.json";
 const SYSTEM_STATE_PATH: &str = "/etc/irrigator/state.json";
-const MAX_LOG_ENTRIES: usize = 50;
+const MAX_LOG_ENTRIES: usize = 500;
+const DEFAULT_DAILY_TARGET_L: f64 = 40.0;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Slot {
@@ -24,6 +25,29 @@ impl std::fmt::Display for Slot {
 pub struct Schedule {
     pub slots: Vec<Slot>,
     pub enabled: bool,
+}
+
+impl Schedule {
+    /// Validate and sort slots. Shared by Telegram and web handlers.
+    pub fn try_from_slots(slots: Vec<Slot>) -> Result<Vec<Slot>, String> {
+        if slots.is_empty() {
+            return Err("no slots provided".to_string());
+        }
+        for s in &slots {
+            if s.hour > 23 {
+                return Err(format!("hour out of range: {}", s.hour));
+            }
+            if s.minute > 59 {
+                return Err(format!("minute out of range: {}", s.minute));
+            }
+            if s.duration_min == 0 || s.duration_min > 120 {
+                return Err(format!("duration must be 1-120, got {}", s.duration_min));
+            }
+        }
+        let mut sorted = slots;
+        sorted.sort_by_key(|s| s.hour * 60 + s.minute);
+        Ok(sorted)
+    }
 }
 
 impl Default for Schedule {
@@ -58,6 +82,10 @@ pub struct AppState {
     pub relay_pin: u8,
     #[serde(default = "default_flow_pin")]
     pub flow_pin: u8,
+    #[serde(default)]
+    pub lifetime_liters: f64,
+    #[serde(default = "default_daily_target")]
+    pub daily_target_liters: f64,
     pub log: Vec<WateringEvent>,
     pub boot_time: DateTime<Utc>,
 
@@ -74,6 +102,8 @@ impl Default for AppState {
             max_on_minutes: 120,
             relay_pin: 17,
             flow_pin: 22,
+            lifetime_liters: 0.0,
+            daily_target_liters: DEFAULT_DAILY_TARGET_L,
             log: Vec::new(),
             boot_time: Utc::now(),
             state_path: PathBuf::from(DEFAULT_STATE_PATH),
@@ -148,11 +178,25 @@ impl AppState {
         self.save();
     }
 
-    pub fn update_last_watering_volume(&mut self, liters: f64) {
-        if let Some(last) = self.log.last_mut() {
-            last.volume_liters = Some(liters);
-            self.save();
+    /// Begin a session: sets valve-open flags and records the event with no volume yet.
+    pub fn start_session(&mut self, duration_min: u32, source: &str) {
+        self.valve_open = true;
+        self.auto_off_at = Some(Utc::now() + chrono::Duration::minutes(duration_min as i64));
+        self.record_watering(duration_min, source, None);
+    }
+
+    /// End a session: clears valve-open flags, accumulates lifetime total, and backfills
+    /// the last log entry with the measured volume. Persists state.
+    pub fn finish_session(&mut self, final_liters: f64) {
+        self.valve_open = false;
+        self.auto_off_at = None;
+        if final_liters > 0.0 {
+            self.lifetime_liters += final_liters;
+            if let Some(last) = self.log.last_mut() {
+                last.volume_liters = Some(final_liters);
+            }
         }
+        self.save();
     }
 
     pub fn status_text(&self) -> String {
@@ -239,6 +283,10 @@ impl AppState {
 
 fn default_flow_pin() -> u8 {
     22
+}
+
+fn default_daily_target() -> f64 {
+    DEFAULT_DAILY_TARGET_L
 }
 
 use chrono::Timelike;

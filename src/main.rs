@@ -3,6 +3,7 @@ mod scheduler;
 mod state;
 mod telegram;
 mod valve;
+mod web;
 
 use std::sync::Arc;
 
@@ -69,6 +70,17 @@ async fn main() {
         scheduler::run(sched_state, sched_valve, sched_flow, sched_bot, allowed_chat).await;
     });
 
+    // Spawn web UI.
+    let web_state = Arc::clone(&state);
+    let web_valve = Arc::clone(&valve);
+    let web_flow = Arc::clone(&flow);
+    let web_bot = bot.clone();
+    let bind_addr =
+        std::env::var("IRRIGATOR_BIND_ADDR").unwrap_or_else(|_| "0.0.0.0:8080".to_string());
+    let web_handle = tokio::spawn(async move {
+        web::run(web_state, web_valve, web_flow, web_bot, allowed_chat, bind_addr).await;
+    });
+
     // Wait for shutdown signal.
     signal::ctrl_c().await.ok();
     info!("shutdown signal received");
@@ -83,4 +95,5 @@ async fn main() {
 
     tg_handle.abort();
     sched_handle.abort();
+    web_handle.abort();
 }

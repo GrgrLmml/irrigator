@@ -1,8 +1,10 @@
 # Irrigator
 
-Raspberry Pi-based garden irrigation controller with a Telegram bot interface. Built for a 10m x 2.5m driveway lawn seeding project — keeps freshly seeded lawn moist during the ~3 week germination period.
+Raspberry Pi-based garden irrigation controller with a Telegram bot and mobile web UI. Built for a 10m x 2.5m driveway lawn seeding project — keeps freshly seeded lawn moist during the ~3 week germination period.
 
-The system runs on a Raspberry Pi 3B with LTE cellular connectivity (no WiFi at the deployment site), controlled remotely via Telegram or SSH over Tailscale VPN.
+The system runs on a Raspberry Pi 3B with LTE cellular connectivity (no WiFi at the deployment site), controlled remotely via Telegram, a mobile web UI, or SSH — all over a Tailscale VPN.
+
+<p align="center"><img src="docs/images/ui-demo.gif" alt="Mobile web UI" width="300"></p>
 
 ## Why Rust?
 
@@ -26,6 +28,24 @@ A solenoid valve controls water flow from an outdoor tap through two soaker hose
 ```
 
 A scheduler runs watering slots automatically (default: 4x daily, 8 minutes each). Every valve open has a max duration timer (default 120 min) to prevent flooding if connectivity is lost.
+
+## Web UI
+
+A mobile web UI is served from the Pi on port 8080 and accessible over Tailscale at `http://irrigator:8080`. No login — Tailscale mesh provides auth at the network layer. The UI auto-adapts to the device's color scheme (dark/light), works offline as a PWA (installable via "Add to Home Screen"), and polls for live updates every 2s while watering.
+
+Features:
+- Valve control with quick-duration buttons (1 / 3 / 5 / 10 min) and a custom Start
+- Live flow metrics during watering (elapsed, volume, L/min) with an animated droplet indicator
+- 60-second flow-rate sparkline while the valve is open
+- Daily water budget with radial progress ring (tappable to change target)
+- 7-day consumption bar chart
+- Editable schedule with enable/disable toggle
+- Recent watering history with source (schedule / telegram / web)
+- Lifetime stats: total liters, average session, peak flow, uptime
+
+Web-initiated actions also post notifications into the Telegram group, so the activity history stays unified across both control paths.
+
+Optional app-level guard: set `IRRIGATOR_WEB_TOKEN=<secret>` in the environment; all API calls then require `?t=<secret>` in the URL or an `X-Irrigator-Token` header.
 
 ## Photos
 

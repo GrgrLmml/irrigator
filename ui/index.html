@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=yes">
+<meta name="theme-color" content="#0d1117">
+<title>Irrigator</title>
+<link rel="stylesheet" href="/styles.css">
+<link rel="manifest" href="/manifest.json">
+</head>
+<body class="state-idle">
+
+<header>
+  <div class="title"><span class="conn-dot" id="conn-dot"></span><span>Irrigator</span></div>
+  <div class="clock" id="clock"></div>
+</header>
+
+<div class="banner warning" id="banner-schedule-off">Schedule disabled &mdash; no automatic watering</div>
+<div class="banner error" id="banner-anomaly">Low flow detected &mdash; check hose or sensor</div>
+<div class="banner warning" id="banner-offline">Reconnecting&hellip;</div>
+
+<!-- Hero -->
+<div class="card hero">
+  <div class="status-row">
+    <div class="status-indicator">
+      <div class="status-dot"></div>
+      <div class="status-text" id="status-text">CLOSED</div>
+    </div>
+    <div class="source-chip" id="source-chip"></div>
+  </div>
+  <div class="droplets" id="droplets"></div>
+  <div class="session-grid" id="session-grid">
+    <div class="metric"><div class="value" id="m-elapsed">&mdash;</div><div class="label">Elapsed</div></div>
+    <div class="metric"><div class="value" id="m-volume">&mdash;</div><div class="label">Volume</div></div>
+    <div class="metric"><div class="value" id="m-flow">&mdash;</div><div class="label">L/min</div></div>
+  </div>
+  <div class="countdown" id="countdown">Auto-off in <strong id="cd">&mdash;</strong></div>
+  <div class="next-slot" id="next-slot">Next scheduled: <strong id="next-slot-text">&mdash;</strong></div>
+  <button class="btn start" id="btn-start">Start watering</button>
+  <button class="btn stop" id="btn-stop">Stop now</button>
+  <div class="quick-chips" id="quick-chips">
+    <button class="chip" data-min="1">1 min</button>
+    <button class="chip" data-min="3">3 min</button>
+    <button class="chip" data-min="5">5 min</button>
+    <button class="chip" data-min="10">10 min</button>
+  </div>
+</div>
+
+<!-- Today -->
+<div class="card">
+  <h2>Today</h2>
+  <div class="today-row">
+    <div class="ring-wrap">
+      <svg width="118" height="118" viewBox="0 0 118 118">
+        <circle cx="59" cy="59" r="50" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="9"/>
+        <circle id="ring-fill" cx="59" cy="59" r="50" fill="none" stroke="url(#ring-grad)" stroke-width="9"
+                stroke-dasharray="314.16" stroke-dashoffset="314.16" stroke-linecap="round"/>
+        <defs>
+          <linearGradient id="ring-grad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#1971c2"/>
+            <stop offset="100%" stop-color="#4dabf7"/>
+          </linearGradient>
+        </defs>
+      </svg>
+      <div class="ring-text">
+        <div class="ring-value" id="ring-value">&mdash;</div>
+        <div class="ring-label">of <span id="ring-target">40</span> L</div>
+      </div>
+    </div>
+    <div class="today-stats">
+      <div class="today-stat"><span class="k">Sessions</span><span class="v" id="today-sessions">&mdash;</span></div>
+      <div class="today-stat"><span class="k">Progress</span><span class="v" id="today-pct">&mdash;</span></div>
+      <div class="today-stat"><span class="k">Last</span><span class="v" id="today-last">&mdash;</span></div>
+      <button class="link-btn" id="btn-target">Edit target</button>
+    </div>
+  </div>
+</div>
+
+<!-- Sparkline (only visible while open) -->
+<div class="card sparkline-card" id="sparkline-card">
+  <h2>Flow rate &middot; last 60s</h2>
+  <div class="sparkline-head">
+    <div>
+      <span class="now" id="spark-now">&mdash;</span><span class="unit">L/min</span>
+    </div>
+    <div class="trend">peak <span id="spark-peak">&mdash;</span></div>
+  </div>
+  <svg class="sparkline" viewBox="0 0 300 56" preserveAspectRatio="none">
+    <defs>
+      <linearGradient id="sp-grad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#4dabf7" stop-opacity="0.35"/>
+        <stop offset="100%" stop-color="#4dabf7" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <path id="spark-area" fill="url(#sp-grad)"/>
+    <path id="spark-line" stroke="#4dabf7" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+</div>
+
+<!-- 7-day chart -->
+<div class="card">
+  <h2>Last 7 days</h2>
+  <div id="week" class="week-list"></div>
+</div>
+
+<!-- Schedule -->
+<div class="card">
+  <div class="sched-head">
+    <h2>Schedule</h2>
+    <div class="toggle" id="sched-toggle"></div>
+  </div>
+  <div id="slots"></div>
+</div>
+
+<!-- History -->
+<div class="card">
+  <h2>Recent</h2>
+  <div id="hist"></div>
+  <div class="empty" id="hist-empty">No watering recorded yet</div>
+</div>
+
+<!-- Stats -->
+<div class="card">
+  <h2>Statistics</h2>
+  <div class="stats-grid">
+    <div class="stat-box"><div class="v" id="stat-total">&mdash;</div><div class="k">Lifetime total</div></div>
+    <div class="stat-box"><div class="v" id="stat-avg">&mdash;</div><div class="k">Avg session</div></div>
+    <div class="stat-box"><div class="v" id="stat-peak">&mdash;</div><div class="k">Peak flow</div></div>
+    <div class="stat-box"><div class="v" id="stat-uptime">&mdash;</div><div class="k">Uptime</div></div>
+  </div>
+</div>
+
+<footer>
+  <span id="version">v0.2.0</span> &middot; connected via Tailscale
+</footer>
+
+<script src="/app.js"></script>
+</body>
+</html>

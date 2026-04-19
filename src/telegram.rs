@@ -129,9 +129,7 @@ async fn handle_command(
 
             flow.lock().await.start_session();
             valve.lock().await.open();
-            st.valve_open = true;
-            st.auto_off_at = Some(chrono::Utc::now() + chrono::Duration::minutes(minutes as i64));
-            st.record_watering(minutes, "telegram", None);
+            st.start_session(minutes, "telegram");
             format!("Valve OPENED for {minutes} minutes.")
         }
         Command::Off => {
@@ -139,13 +137,7 @@ async fn handle_command(
             valve.lock().await.close();
             let mut st = state.lock().await;
             let had_valve_open = st.valve_open;
-            st.valve_open = false;
-            st.auto_off_at = None;
-            if had_valve_open {
-                st.update_last_watering_volume(final_liters);
-            } else {
-                st.save();
-            }
+            st.finish_session(final_liters);
             if had_valve_open && final_liters > 0.0 {
                 format!("Valve CLOSED. Total: {final_liters:.1}L.")
             } else {
@@ -203,23 +195,7 @@ fn parse_schedule(input: &str) -> Result<Vec<crate::state::Slot>, String> {
         let hour: u32 = h.parse().map_err(|_| format!("invalid hour: {h}"))?;
         let minute: u32 = m.parse().map_err(|_| format!("invalid minute: {m}"))?;
         let duration_min: u32 = dur.parse().map_err(|_| format!("invalid duration: {dur}"))?;
-
-        if hour > 23 || minute > 59 {
-            return Err(format!("invalid time: {time}"));
-        }
-        if duration_min == 0 || duration_min > 120 {
-            return Err(format!("duration must be 1-120, got {duration_min}"));
-        }
-
-        slots.push(crate::state::Slot {
-            hour,
-            minute,
-            duration_min,
-        });
+        slots.push(crate::state::Slot { hour, minute, duration_min });
     }
-    if slots.is_empty() {
-        return Err("no slots provided".to_string());
-    }
-    slots.sort_by_key(|s| s.hour * 60 + s.minute);
-    Ok(slots)
+    crate::state::Schedule::try_from_slots(slots)
 }

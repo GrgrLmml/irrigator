@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=yes">
+<meta name="theme-color" content="#0d1117">
+<title>Irrigator</title>
+<style>
+:root {
+  --bg: #0d1117;
+  --card: #161b22;
+  --card-inner: rgba(255,255,255,0.03);
+  --border: #30363d;
+  --text: #e6edf3;
+  --muted: #8b949e;
+  --water: #4dabf7;
+  --water-dark: #1971c2;
+  --open: #3fb950;
+  --closed: #8b949e;
+  --warning: #f0a020;
+  --error: #f85149;
+  --radius: 14px;
+  --gap: 12px;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f6f8fa;
+    --card: #ffffff;
+    --card-inner: rgba(0,0,0,0.03);
+    --border: #d0d7de;
+    --text: #1f2328;
+    --muted: #656d76;
+  }
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { background: var(--bg); }
+body {
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.4;
+  padding: 16px;
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+  padding-bottom: 32px;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding: 0 4px;
+}
+header .title {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+header .conn-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--open);
+  box-shadow: 0 0 6px var(--open);
+}
+header .clock {
+  font-size: 13px;
+  color: var(--muted);
+  font-feature-settings: "tnum";
+}
+
+.banner {
+  padding: 11px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 12px;
+  display: none;
+  border: 1px solid transparent;
+}
+.banner.warning { background: rgba(240,160,32,0.12); border-color: rgba(240,160,32,0.3); color: var(--warning); }
+.banner.error { background: rgba(248,81,73,0.12); border-color: rgba(248,81,73,0.3); color: var(--error); }
+body.state-schedule-disabled .banner.schedule-off { display: block; }
+body.state-anomaly .banner.anomaly { display: block; }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  margin-bottom: var(--gap);
+}
+.card h2 {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 14px;
+}
+
+/* Hero */
+.hero .status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.hero .status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.status-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--closed);
+  transition: background 0.2s;
+}
+body.open .status-dot {
+  background: var(--open);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(63,185,80,0.6); }
+  50% { box-shadow: 0 0 0 10px rgba(63,185,80,0); }
+}
+.hero .status-text {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+body.open .hero .status-text { color: var(--open); }
+.hero .source-chip {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
+}
+body.open .hero .source-chip { color: var(--water); }
+body.state-anomaly .hero .source-chip { color: var(--error); font-weight: 600; }
+
+.droplets {
+  height: 50px;
+  position: relative;
+  overflow: hidden;
+  margin: 6px 0 14px;
+  display: none;
+}
+body.open .droplets { display: block; }
+body.state-anomaly .droplets { display: none; }
+
+.droplet {
+  position: absolute;
+  top: 0;
+  width: 5px;
+  height: 12px;
+  background: var(--water);
+  border-radius: 50% 50% 40% 40%;
+  animation: fall 1.4s linear infinite;
+  opacity: 0;
+  filter: drop-shadow(0 0 3px rgba(77,171,247,0.6));
+}
+@keyframes fall {
+  0% { transform: translateY(-14px); opacity: 0; }
+  15% { opacity: 0.95; }
+  85% { opacity: 0.95; }
+  100% { transform: translateY(62px); opacity: 0; }
+}
+
+.session-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 14px;
+  display: none;
+}
+body.open .session-grid { display: grid; }
+
+.metric {
+  background: var(--card-inner);
+  padding: 12px 8px;
+  border-radius: 10px;
+  text-align: center;
+}
+.metric .value {
+  font-size: 22px;
+  font-weight: 700;
+  font-feature-settings: "tnum";
+  letter-spacing: -0.02em;
+}
+.metric .label {
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-top: 4px;
+  font-weight: 600;
+}
+
+.countdown, .next-slot {
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+  margin-bottom: 14px;
+  display: none;
+}
+.countdown strong { color: var(--text); font-weight: 600; font-feature-settings: "tnum"; }
+.next-slot strong { color: var(--text); font-weight: 600; }
+body.open .countdown { display: block; }
+body:not(.open) .next-slot { display: block; }
+body.state-schedule-disabled .next-slot { display: none; }
+body.state-schedule-disabled .next-slot.disabled-msg { display: block; }
+
+.btn {
+  width: 100%;
+  min-height: 54px;
+  border: none;
+  border-radius: 12px;
+  font-size: 17px;
+  font-weight: 600;
+  cursor: pointer;
+  letter-spacing: 0.01em;
+  transition: transform 0.08s, background 0.15s, box-shadow 0.15s;
+  display: none;
+}
+.btn:active { transform: scale(0.98); }
+.btn.start {
+  background: var(--water);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(77,171,247,0.25);
+}
+.btn.start:hover { background: var(--water-dark); }
+.btn.stop {
+  background: var(--error);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(248,81,73,0.25);
+}
+body:not(.open) .btn.start { display: block; }
+body.open .btn.stop { display: block; }
+
+.quick-chips {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+}
+body.open .quick-chips { display: none; }
+.chip {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 12px 0;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.1s, background 0.1s;
+}
+.chip:hover { border-color: var(--water); background: rgba(77,171,247,0.08); }
+.chip:active { transform: scale(0.97); }
+
+/* Today */
+.today-row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.ring-wrap {
+  position: relative;
+  width: 118px;
+  height: 118px;
+  flex-shrink: 0;
+}
+.ring-wrap svg { transform: rotate(-90deg); }
+.ring-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.ring-value { font-size: 22px; font-weight: 700; font-feature-settings: "tnum"; letter-spacing: -0.01em; }
+.ring-label { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.today-stats { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+.today-stat { display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; }
+.today-stat .k { color: var(--muted); }
+.today-stat .v { font-weight: 600; font-feature-settings: "tnum"; }
+.link-btn {
+  background: transparent;
+  border: none;
+  color: var(--water);
+  cursor: pointer;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+  margin-top: 2px;
+}
+
+/* Sparkline */
+.sparkline-card { display: none; }
+body.open .sparkline-card { display: block; }
+.sparkline-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+.sparkline-head .now { font-size: 22px; font-weight: 700; font-feature-settings: "tnum"; letter-spacing: -0.01em; }
+.sparkline-head .unit { font-size: 12px; color: var(--muted); margin-left: 6px; font-weight: 500; }
+.sparkline-head .trend { font-size: 12px; color: var(--muted); font-feature-settings: "tnum"; }
+.sparkline { width: 100%; height: 56px; display: block; }
+
+/* Week chart */
+.day-row {
+  display: grid;
+  grid-template-columns: 42px 1fr 64px;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+.day-row:last-child { margin-bottom: 0; }
+.day-label { color: var(--muted); font-feature-settings: "tnum"; font-weight: 500; }
+.day-bar {
+  height: 20px;
+  background: rgba(77,171,247,0.10);
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
+}
+.day-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--water-dark), var(--water));
+  border-radius: 4px;
+  min-width: 2px;
+}
+.day-row.today .day-bar-fill { background: linear-gradient(90deg, #2f9e44, #51cf66); }
+.day-value { text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; }
+
+/* Schedule */
+.sched-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.sched-head h2 { margin-bottom: 0; }
+.toggle {
+  position: relative;
+  width: 44px;
+  height: 26px;
+  background: var(--border);
+  border-radius: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+.toggle::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.15s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.toggle.on { background: var(--open); }
+.toggle.on::after { transform: translateX(18px); }
+
+.slot-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.slot-row:last-child { border-bottom: none; padding-bottom: 0; }
+.slot-row:first-child { padding-top: 0; }
+.slot-row .time {
+  font-feature-settings: "tnum";
+  font-size: 16px;
+  font-weight: 600;
+}
+.slot-row .dur { color: var(--muted); font-size: 13px; margin-left: 10px; }
+.icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 6px;
+  font-size: 14px;
+}
+.icon-btn:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+body.state-schedule-disabled .slot-row { opacity: 0.45; }
+
+/* History */
+.hist-row {
+  display: grid;
+  grid-template-columns: 72px 56px 1fr 70px;
+  gap: 8px;
+  padding: 9px 0;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+}
+.hist-row:last-child { border-bottom: none; padding-bottom: 0; }
+.hist-row:first-child { padding-top: 0; }
+.hist-row .t { color: var(--muted); font-feature-settings: "tnum"; }
+.hist-row .d { color: var(--muted); }
+.hist-row .v { text-align: right; font-weight: 600; font-feature-settings: "tnum"; }
+.hist-row .src {
+  text-align: right;
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+}
+.hist-row .src.telegram { color: var(--water); }
+
+.empty {
+  color: var(--muted);
+  text-align: center;
+  padding: 24px 0;
+  font-size: 13px;
+  display: none;
+}
+body.state-booted .empty { display: block; }
+body.state-booted .hist-row { display: none; }
+body.state-booted .week-list .day-row:not(:last-child) { display: none; }
+
+/* Stats */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+.stat-box {
+  background: var(--card-inner);
+  padding: 12px;
+  border-radius: 10px;
+}
+.stat-box .v {
+  font-size: 20px;
+  font-weight: 700;
+  font-feature-settings: "tnum";
+  letter-spacing: -0.01em;
+}
+.stat-box .k {
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-top: 4px;
+  font-weight: 600;
+}
+
+footer {
+  text-align: center;
+  font-size: 11px;
+  color: var(--muted);
+  padding: 20px 0 8px;
+  opacity: 0.7;
+  font-feature-settings: "tnum";
+}
+
+/* Debug panel */
+.debug-panel {
+  display: none;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 12px;
+}
+body.debug .debug-panel { display: block; }
+.debug-panel label {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  display: block;
+  margin-bottom: 6px;
+}
+.debug-panel select {
+  width: 100%;
+  padding: 10px;
+  background: var(--card-inner);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: inherit;
+}
+</style>
+</head>
+<body class="state-idle">
+
+<div class="debug-panel">
+  <label>Debug state</label>
+  <select id="debug-state">
+    <option value="state-idle">Idle (valve closed)</option>
+    <option value="state-watering-schedule">Watering (schedule)</option>
+    <option value="state-watering-manual">Watering (manual)</option>
+    <option value="state-anomaly">Flow anomaly</option>
+    <option value="state-booted">Just booted</option>
+    <option value="state-schedule-disabled">Schedule disabled</option>
+  </select>
+</div>
+
+<header>
+  <div class="title">
+    <span class="conn-dot"></span>
+    <span>Irrigator</span>
+  </div>
+  <div class="clock" id="clock">14:32</div>
+</header>
+
+<div class="banner warning schedule-off">Schedule disabled — no automatic watering</div>
+<div class="banner error anomaly">Low flow detected — check hose or sensor</div>
+
+<!-- Hero -->
+<div class="card hero">
+  <div class="status-row">
+    <div class="status-indicator">
+      <div class="status-dot"></div>
+      <div class="status-text" id="status-text">CLOSED</div>
+    </div>
+    <div class="source-chip" id="source-chip"></div>
+  </div>
+
+  <div class="droplets" id="droplets"></div>
+
+  <div class="session-grid">
+    <div class="metric"><div class="value" id="m-elapsed">3:24</div><div class="label">Elapsed</div></div>
+    <div class="metric"><div class="value" id="m-volume">3.7 L</div><div class="label">Volume</div></div>
+    <div class="metric"><div class="value" id="m-flow">1.1</div><div class="label">L/min</div></div>
+  </div>
+
+  <div class="countdown">Auto-off in <strong id="cd">4:36</strong></div>
+  <div class="next-slot">Next scheduled: <strong id="next-slot">16:00 today</strong> (3 min)</div>
+  <div class="next-slot disabled-msg" style="display:none;">Tap Start to water manually</div>
+
+  <button class="btn start">Start watering</button>
+  <button class="btn stop">Stop now</button>
+
+  <div class="quick-chips">
+    <button class="chip">1 min</button>
+    <button class="chip">3 min</button>
+    <button class="chip">5 min</button>
+    <button class="chip">10 min</button>
+  </div>
+</div>
+
+<!-- Today -->
+<div class="card">
+  <h2>Today</h2>
+  <div class="today-row">
+    <div class="ring-wrap">
+      <svg width="118" height="118" viewBox="0 0 118 118">
+        <circle cx="59" cy="59" r="50" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="9"/>
+        <circle id="ring-fill" cx="59" cy="59" r="50" fill="none" stroke="url(#ring-grad)" stroke-width="9"
+                stroke-dasharray="314.16" stroke-dashoffset="185" stroke-linecap="round"/>
+        <defs>
+          <linearGradient id="ring-grad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#1971c2"/>
+            <stop offset="100%" stop-color="#4dabf7"/>
+          </linearGradient>
+        </defs>
+      </svg>
+      <div class="ring-text">
+        <div class="ring-value" id="ring-value">16.4 L</div>
+        <div class="ring-label">of <span id="ring-target">40</span> L</div>
+      </div>
+    </div>
+    <div class="today-stats">
+      <div class="today-stat"><span class="k">Sessions</span><span class="v" id="today-sessions">2 of 6</span></div>
+      <div class="today-stat"><span class="k">Progress</span><span class="v" id="today-pct">41%</span></div>
+      <div class="today-stat"><span class="k">Last</span><span class="v" id="today-last">13:00</span></div>
+      <button class="link-btn">Edit target</button>
+    </div>
+  </div>
+</div>
+
+<!-- Sparkline (visible only while open) -->
+<div class="card sparkline-card">
+  <h2>Flow rate · last 60s</h2>
+  <div class="sparkline-head">
+    <div>
+      <span class="now" id="spark-now">1.1</span><span class="unit">L/min</span>
+    </div>
+    <div class="trend">peak <span id="spark-peak">1.4</span></div>
+  </div>
+  <svg class="sparkline" viewBox="0 0 300 56" preserveAspectRatio="none">
+    <defs>
+      <linearGradient id="sp-grad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#4dabf7" stop-opacity="0.35"/>
+        <stop offset="100%" stop-color="#4dabf7" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <path id="spark-area" fill="url(#sp-grad)"/>
+    <path id="spark-line" stroke="#4dabf7" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+</div>
+
+<!-- 7-day chart -->
+<div class="card">
+  <h2>Last 7 days</h2>
+  <div id="week" class="week-list"></div>
+</div>
+
+<!-- Schedule -->
+<div class="card">
+  <div class="sched-head">
+    <h2>Schedule</h2>
+    <div class="toggle on" id="sched-toggle"></div>
+  </div>
+  <div id="slots"></div>
+</div>
+
+<!-- History -->
+<div class="card">
+  <h2>Recent</h2>
+  <div id="hist"></div>
+  <div class="empty">No watering recorded yet</div>
+</div>
+
+<!-- Stats -->
+<div class="card">
+  <h2>Statistics</h2>
+  <div class="stats-grid">
+    <div class="stat-box"><div class="v" id="stat-total">1 247 L</div><div class="k">Lifetime total</div></div>
+    <div class="stat-box"><div class="v" id="stat-avg">6.1 L</div><div class="k">Avg session</div></div>
+    <div class="stat-box"><div class="v" id="stat-peak">1.4 L/min</div><div class="k">Peak flow</div></div>
+    <div class="stat-box"><div class="v" id="stat-uptime">8h 22m</div><div class="k">Uptime</div></div>
+  </div>
+</div>
+
+<footer>
+  v0.2.0 · connected via Tailscale
+</footer>
+
+<script>
+// ---- Debug state switcher (?debug=1) ----
+const debugStates = {
+  'state-idle':                { open: false, src: '', elapsed: '', volume: '', flow: '', cd: '', next: '16:00 today', ring: 16.4 },
+  'state-watering-schedule':   { open: true,  src: 'Schedule · 3 min', elapsed: '1:24', volume: '14.2 L', flow: '1.1',  cd: '1:36', sparkNow: '1.1', sparkPeak: '1.4', ring: 30.6 },
+  'state-watering-manual':     { open: true,  src: 'Manual · 5 min',   elapsed: '0:52', volume: '8.9 L',  flow: '1.2',  cd: '4:08', sparkNow: '1.2', sparkPeak: '1.3', ring: 25.3 },
+  'state-anomaly':             { open: true,  src: 'Schedule · low flow!', elapsed: '0:32', volume: '0.0 L', flow: '0.0', cd: '2:28', sparkNow: '0.0', sparkPeak: '0.1', ring: 16.4 },
+  'state-booted':              { open: false, src: '', elapsed: '', volume: '', flow: '', cd: '', next: '06:00 tomorrow', ring: 0, bootedUptime: '12s' },
+  'state-schedule-disabled':   { open: false, src: '', elapsed: '', volume: '', flow: '', cd: '', next: '(disabled)', ring: 16.4 },
+};
+
+function applyState(key) {
+  const s = debugStates[key];
+  document.body.className = (document.body.classList.contains('debug') ? 'debug ' : '') + key + (s.open ? ' open' : '');
+  document.getElementById('status-text').textContent = s.open ? 'OPEN' : 'CLOSED';
+  document.getElementById('source-chip').textContent = s.src || '';
+  document.getElementById('m-elapsed').textContent = s.elapsed || '—';
+  document.getElementById('m-volume').textContent = s.volume || '—';
+  document.getElementById('m-flow').textContent = s.flow || '—';
+  document.getElementById('cd').textContent = s.cd || '';
+  document.getElementById('next-slot').textContent = s.next || '';
+  if (s.sparkNow) {
+    document.getElementById('spark-now').textContent = s.sparkNow;
+    document.getElementById('spark-peak').textContent = s.sparkPeak;
+    renderSparkline(key === 'state-anomaly' ? anomalyFlowData : normalFlowData);
+  }
+  // Ring
+  const target = 40;
+  const pct = Math.min(1, (s.ring || 0) / target);
+  const circ = 314.16;
+  document.getElementById('ring-fill').setAttribute('stroke-dashoffset', circ * (1 - pct));
+  document.getElementById('ring-value').textContent = (s.ring || 0).toFixed(1) + ' L';
+  document.getElementById('today-pct').textContent = Math.round(pct * 100) + '%';
+  document.getElementById('today-sessions').textContent = (key === 'state-booted' ? '0 of 5' : '2 of 5');
+  document.getElementById('today-last').textContent = (key === 'state-booted' ? '—' : '13:00');
+  if (s.bootedUptime) document.getElementById('stat-uptime').textContent = s.bootedUptime;
+}
+
+if (location.search.includes('debug=1') || location.hash === '#debug') {
+  document.body.classList.add('debug');
+  document.getElementById('debug-state').addEventListener('change', (e) => {
+    applyState(e.target.value);
+  });
+}
+
+// ---- Droplets ----
+const droplets = document.getElementById('droplets');
+for (let i = 0; i < 9; i++) {
+  const d = document.createElement('div');
+  d.className = 'droplet';
+  d.style.left = (6 + i * 11) + '%';
+  d.style.animationDelay = (-i * 0.14) + 's';
+  droplets.appendChild(d);
+}
+
+// ---- Sparkline fake data ----
+const normalFlowData = Array.from({length: 61}, (_, i) => {
+  const base = 1.0;
+  const noise = Math.sin(i * 0.4) * 0.15 + Math.random() * 0.1;
+  const ramp = i < 10 ? i / 10 * 0.6 : 0.6;
+  return Math.max(0, base + noise + (ramp - 0.6));
+});
+const anomalyFlowData = Array.from({length: 61}, (_, i) => Math.max(0, 0.05 + (Math.random() - 0.5) * 0.05));
+
+function renderSparkline(data) {
+  const W = 300, H = 56, pad = 4;
+  const max = Math.max(1.5, ...data);
+  const n = data.length;
+  const pts = data.map((v, i) => {
+    const x = (i / (n - 1)) * W;
+    const y = H - pad - (v / max) * (H - pad * 2);
+    return [x, y];
+  });
+  const line = pts.map(([x, y], i) => (i === 0 ? `M${x.toFixed(1)},${y.toFixed(1)}` : `L${x.toFixed(1)},${y.toFixed(1)}`)).join(' ');
+  const area = line + ` L${W},${H} L0,${H} Z`;
+  document.getElementById('spark-line').setAttribute('d', line);
+  document.getElementById('spark-area').setAttribute('d', area);
+}
+renderSparkline(normalFlowData);
+
+// ---- Week data ----
+const days = [
+  { label: 'Mon', liters: 32.1 },
+  { label: 'Tue', liters: 29.4 },
+  { label: 'Wed', liters: 41.2 },
+  { label: 'Thu', liters: 38.7 },
+  { label: 'Fri', liters: 35.0 },
+  { label: 'Sat', liters: 33.9 },
+  { label: 'Today', liters: 16.4 },
+];
+const dmax = Math.max(...days.map(d => d.liters));
+const weekEl = document.getElementById('week');
+days.forEach((d, idx) => {
+  const row = document.createElement('div');
+  row.className = 'day-row' + (idx === days.length - 1 ? ' today' : '');
+  row.innerHTML = `
+    <div class="day-label">${d.label}</div>
+    <div class="day-bar"><div class="day-bar-fill" style="width:${(d.liters / dmax * 100).toFixed(1)}%"></div></div>
+    <div class="day-value">${d.liters.toFixed(1)} L</div>`;
+  weekEl.appendChild(row);
+});
+
+// ---- Schedule ----
+const slots = [
+  { hour: 6, min: 0, dur: 1 },
+  { hour: 8, min: 0, dur: 1 },
+  { hour: 10, min: 0, dur: 2 },
+  { hour: 13, min: 0, dur: 1 },
+  { hour: 16, min: 0, dur: 3 },
+];
+const slotsEl = document.getElementById('slots');
+slots.forEach(s => {
+  const row = document.createElement('div');
+  row.className = 'slot-row';
+  row.innerHTML = `
+    <div>
+      <span class="time">${String(s.hour).padStart(2,'0')}:${String(s.min).padStart(2,'0')}</span>
+      <span class="dur">${s.dur} min</span>
+    </div>
+    <button class="icon-btn" title="Edit">✎</button>`;
+  slotsEl.appendChild(row);
+});
+document.getElementById('sched-toggle').addEventListener('click', (e) => {
+  e.currentTarget.classList.toggle('on');
+});
+
+// ---- History ----
+const hist = [
+  { t: '13:00',      dur: 1, vol: 15.8, src: 'schedule' },
+  { t: '10:00',      dur: 2, vol: 20.3, src: 'schedule' },
+  { t: '07:00',      dur: 1, vol: 9.8,  src: 'schedule' },
+  { t: '04:00',      dur: 1, vol: 9.2,  src: 'schedule' },
+  { t: 'yest 16:00', dur: 3, vol: 33.1, src: 'schedule' },
+  { t: 'yest 13:00', dur: 1, vol: 15.8, src: 'schedule' },
+  { t: 'yest 10:00', dur: 2, vol: 20.3, src: 'schedule' },
+  { t: 'yest 07:00', dur: 1, vol: 9.8,  src: 'telegram' },
+];
+const histEl = document.getElementById('hist');
+hist.forEach(h => {
+  const row = document.createElement('div');
+  row.className = 'hist-row';
+  row.innerHTML = `
+    <div class="t">${h.t}</div>
+    <div class="d">${h.dur} min</div>
+    <div class="v">${h.vol.toFixed(1)} L</div>
+    <div class="src ${h.src}">${h.src}</div>`;
+  histEl.appendChild(row);
+});
+
+// ---- Clock ----
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+}
+updateClock();
+setInterval(updateClock, 30000);
+
+// ---- Haptics + click log ----
+document.querySelectorAll('button').forEach(b => {
+  b.addEventListener('click', () => {
+    if (navigator.vibrate) navigator.vibrate(20);
+    console.log('[mockup] would call:', b.textContent.trim());
+  });
+});
+
+// Apply initial state
+applyState('state-idle');
+</script>
+</body>
+</html>
